@@ -1,0 +1,68 @@
+services:
+  video-converter:
+    build: .
+    container_name: video-converter-app
+    environment:
+      - DISPLAY=:99
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount directories for input and output files
+      - ./input:/app/input
+      - ./output:/app/output
+      # Mount X11 socket for GUI (Linux hosts)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    networks:
+      - video-converter-network
+    # For GUI access on Linux hosts
+    # network_mode: "host"   # <-- Remove or comment out this line
+    stdin_open: true
+    tty: true
+    
+  # Alternative service for headless operation
+  video-converter-headless:
+    build: .
+    container_name: video-converter-headless
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+    command: >
+      python3 -c "
+      import sys, os
+      sys.path.append('/app')
+      from utils import VideoProcessor, FFmpegHandler
+
+      # Example headless conversion
+      processor = VideoProcessor()
+
+      # Process all files in input directory
+      input_dir = '/app/input'
+      output_dir = '/app/output'
+    
+      if os.path.exists(input_dir):
+          for file in os.listdir(input_dir):
+              if file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')):
+                  input_path = os.path.join(input_dir, file)
+                  output_path = os.path.join(output_dir, f'{os.path.splitext(file)[0]}_converted.mp4')
+                  print(f'Converting {file}...')
+                  success = processor.convert_video(input_path, output_path, 'mp4')
+                  print(f'Conversion {'successful' if success else 'failed'} for {file}')
+      else:
+          print('No input directory found. Place video files in ./input/')
+            "
+    profiles:
+      - headless
+    networks:
+      - video-converter-network
+
+networks:
+  video-converter-network:
+    driver: bridge
+
+# Volume definitions for persistent storage
+volumes:
+  video_input:
+    driver: local
+  video_output:
+    driver: local
